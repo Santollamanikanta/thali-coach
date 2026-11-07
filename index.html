@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Thali Coach — gentle Indian diet &amp; activity companion</title>
+  <meta name="description" content="A small, private companion for Indian home cooking, daily walks and healthy habits.">
+  <meta name="theme-color" content="#2f7d32">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Thali Coach">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">🌿</span>
+        <div>
+          <h1>Thali Coach</h1>
+          <p class="tagline">Small habits, real thalis.</p>
+        </div>
+      </div>
+      <span id="modeBadge" class="badge" hidden></span>
+    </header>
+
+    <main id="main">
+
+      <!-- 1 · SETUP ------------------------------------------------------ -->
+      <section id="screen-setup" class="screen" hidden>
+        <h2>Set up</h2>
+        <p class="lede">Everything stays on this phone. No login, no sharing.</p>
+
+        <form id="setupForm" novalidate>
+          <div class="card">
+            <h3>About you</h3>
+
+            <div class="field">
+              <label for="age">Age (years)</label>
+              <input id="age" name="age" type="number" min="10" max="100" inputmode="numeric" placeholder="e.g. 32" required>
+              <p class="hint">We ask age first because safety comes before targets.</p>
+            </div>
+
+            <div class="field">
+              <label for="sex">Sex</label>
+              <select id="sex" name="sex">
+                <option value="" disabled selected>Select</option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="other">Other / prefer not to say</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <span class="label">Height</span>
+              <div class="row2">
+                <div class="input-suffix">
+                  <input id="heightFt" name="heightFt" type="number" min="3" max="8" inputmode="numeric" aria-label="Height in feet">
+                  <span>ft</span>
+                </div>
+                <div class="input-suffix">
+                  <input id="heightIn" name="heightIn" type="number" min="0" max="11" inputmode="numeric" aria-label="Height in inches">
+                  <span>in</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="weight">Weight (kg)</label>
+              <input id="weight" name="weight" type="number" min="25" max="300" step="0.1" inputmode="decimal" placeholder="e.g. 62.4">
+            </div>
+
+            <div class="field">
+              <label for="activity">Daily activity</label>
+              <select id="activity" name="activity">
+                <option value="sedentary">Mostly sitting (desk job, little walking)</option>
+                <option value="light" selected>Lightly active (some walking, chores)</option>
+                <option value="moderate">Moderately active (regular walks or workouts)</option>
+                <option value="active">Very active (physical job or daily training)</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="diet">Diet type</label>
+              <select id="diet" name="diet">
+                <option value="veg">Vegetarian</option>
+                <option value="egg">Eggetarian</option>
+                <option value="nonveg">Non-vegetarian</option>
+                <option value="vegan">Vegan</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="budget">Weekly grocery budget</label>
+              <select id="budget" name="budget">
+                <option value="800">Around ₹800</option>
+                <option value="1200" selected>Around ₹1,200</option>
+                <option value="1800">Around ₹1,800</option>
+                <option value="2500">Around ₹2,500</option>
+              </select>
+              <p class="hint">Used only to show rough grocery costs. You can change it later.</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Foods you love</h3>
+            <p class="hint">Tap what you already enjoy. We keep familiar food in the plan.</p>
+            <div class="chips" id="loveChips"></div>
+            <div class="field">
+              <label for="lovedText">Anything else?</label>
+              <input id="lovedText" type="text" placeholder="e.g. lemon rice, rajma, Sunday biryani">
+            </div>
+          </div>
+
+          <div class="card safety-card">
+            <h3>Safety check</h3>
+            <p class="hint">If any of these apply, we switch to a kind “healthy habits” mode and skip calorie deficits. You can still use the whole app.</p>
+
+            <div id="pregnancyRow" class="field">
+              <span class="label">If this applies to you</span>
+              <label class="check"><input type="checkbox" id="pregnant"> Pregnant</label>
+              <label class="check"><input type="checkbox" id="breastfeeding"> Breastfeeding</label>
+            </div>
+
+            <div class="field">
+              <label for="condition">Medical condition</label>
+              <select id="condition">
+                <option value="none">None</option>
+                <option value="diabetes">Diabetes / blood sugar</option>
+                <option value="pcos">PCOS / thyroid</option>
+                <option value="heart">Blood pressure / heart</option>
+                <option value="kidney">Kidney or liver condition</option>
+                <option value="other">Something else</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="edHistory">Past or current disordered eating</label>
+              <select id="edHistory">
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+
+            <p class="small muted">This is a food and movement companion, not medical advice. For anything medical, please see a doctor or registered dietitian.</p>
+          </div>
+
+          <p id="setupError" class="error" role="alert" hidden></p>
+          <button class="btn btn-wide" type="submit">Save &amp; see my estimates</button>
+          <p class="small muted center">Numbers are estimates. You are not a maths problem.</p>
+        </form>
+      </section>
+
+      <!-- 2 · TARGETS ---------------------------------------------------- -->
+      <section id="screen-targets" class="screen" hidden>
+        <h2>Your estimates</h2>
+        <p class="lede">A gentle starting point — not a prescription.</p>
+        <div id="targetsContent"></div>
+      </section>
+
+      <!-- 3 · PLAN ------------------------------------------------------- -->
+      <section id="screen-plan" class="screen" hidden>
+        <h2>7-day plan</h2>
+        <p class="lede">Familiar food, realistic portions. Tap a day.</p>
+        <p class="week-label" id="weekLabel"></p>
+        <div class="day-tabs" id="dayTabs" role="tablist" aria-label="Days of the week"></div>
+        <div id="planContent"></div>
+      </section>
+
+      <!-- 4 · GROCERIES -------------------------------------------------- -->
+      <section id="screen-groceries" class="screen" hidden>
+        <h2>Groceries</h2>
+        <p class="lede">One week, one list. Costs are rough estimates.</p>
+        <div id="groceryContent"></div>
+      </section>
+
+      <!-- 5 · PREP ------------------------------------------------------- -->
+      <section id="screen-prep" class="screen" hidden>
+        <h2>Prep</h2>
+        <p class="lede">A little Sunday effort makes the week kinder.</p>
+        <div id="prepContent"></div>
+      </section>
+
+      <!-- 6 · ACTIVITY --------------------------------------------------- -->
+      <section id="screen-activity" class="screen" hidden>
+        <h2>Activity</h2>
+        <p class="lede">Movement you enjoy beats movement you dread.</p>
+        <div id="activityContent"></div>
+      </section>
+
+      <!-- 7 · PROGRESS --------------------------------------------------- -->
+      <section id="screen-progress" class="screen" hidden>
+        <h2>Progress</h2>
+        <p class="lede">Trends over weeks. Never one bad day.</p>
+        <div id="progressContent"></div>
+      </section>
+
+      <!-- 8 · REMINDERS -------------------------------------------------- -->
+      <section id="screen-reminders" class="screen" hidden>
+        <h2>Reminders</h2>
+        <p class="lede">Gentle nudges, not alarms. You can switch any off.</p>
+        <div id="remindersContent"></div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <p>Made for Indian kitchens. Estimates only, not medical advice.<br>If you need individual guidance, see a doctor or registered dietitian.</p>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <nav class="tabbar" id="tabbar" aria-label="Main navigation">
+    <button type="button" data-screen="setup"      class="tab"><span class="tab-icon" aria-hidden="true">👤</span><span>Setup</span></button>
+    <button type="button" data-screen="targets"    class="tab"><span class="tab-icon" aria-hidden="true">🎯</span><span>Targets</span></button>
+    <button type="button" data-screen="plan"       class="tab"><span class="tab-icon" aria-hidden="true">🍽️</span><span>Plan</span></button>
+    <button type="button" data-screen="groceries"  class="tab"><span class="tab-icon" aria-hidden="true">🛒</span><span>Food</span></button>
+    <button type="button" data-screen="prep"       class="tab"><span class="tab-icon" aria-hidden="true">🥘</span><span>Prep</span></button>
+    <button type="button" data-screen="activity"   class="tab"><span class="tab-icon" aria-hidden="true">🚶</span><span>Move</span></button>
+    <button type="button" data-screen="progress"   class="tab"><span class="tab-icon" aria-hidden="true">📈</span><span>Progress</span></button>
+    <button type="button" data-screen="reminders"  class="tab"><span class="tab-icon" aria-hidden="true">🔔</span><span>Nudges</span></button>
+  </nav>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

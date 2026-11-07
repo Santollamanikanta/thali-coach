@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Thali Coach">
+  <rect width="512" height="512" rx="120" fill="#eefaf2"/>
+  <circle cx="256" cy="282" r="156" fill="#2f7d32"/>
+  <circle cx="256" cy="282" r="122" fill="#fdf3d3"/>
+  <circle cx="208" cy="238" r="36" fill="#2f7d32"/>
+  <circle cx="304" cy="238" r="36" fill="#2f7d32"/>
+  <circle cx="256" cy="330" r="36" fill="#2f7d32"/>
+  <circle cx="256" cy="282" r="18" fill="#e6a700"/>
+  <path d="M256 120c-30 18-46 42-46 68 0 20 9 35 22 44 4-26 12-45 24-58 12 13 20 32 24 58 13-9 22-24 22-44 0-26-16-50-46-68z" fill="#2f7d32"/>
+  <path d="M256 132c-8 22-9 44-3 66 8-7 14-16 18-27 5-14 0-27-15-39z" fill="#86cf8a"/>
+</svg>
