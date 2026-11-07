@@ -20,6 +20,27 @@ Then open <http://localhost:8000> on your computer, or on your phone using your
 computer's local IP on the same Wi‑Fi. Notifications and “Install app” need
 `http://localhost` or `https://`.
 
+## Android app (APK)
+
+`download/thali-coach.apk` is a signed sideload build — no Play Store needed.
+It is a tiny WebView shell (`com.thalicoach.app`) that bundles these same files
+in `assets/www` and serves them from a fake `https://app.thali.local` origin, so
+`localStorage` persists and the app works fully offline.
+
+Rebuild it (no Gradle, no internet) with the separate project in
+`C:\Users\DELL\thali-coach-android`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\Users\DELL\thali-coach-android\build.ps1
+```
+
+That script copies the web files in, then runs `aapt2` → `javac` → `d8` →
+`zipalign` → `apksigner` and drops the finished APK into `download/`.
+
+Limits of the shell: the app's own service worker is disabled inside it (so
+updates are never stale) and browser notifications are unavailable, so the
+Reminders tab can only show in-app nudges.
+
 ## Files
 
 | File | What it does |
