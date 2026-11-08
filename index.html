@@ -13,6 +13,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Thali Coach">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="coach.css">
 </head>
 <body>
   <div class="app">
@@ -159,6 +160,7 @@
         <h2>Your estimates</h2>
         <p class="lede">A gentle starting point — not a prescription.</p>
         <div id="targetsContent"></div>
+        <p class="center"><button type="button" class="btn btn-ghost btn-slim" data-go="setup">Edit my details</button></p>
       </section>
 
       <!-- 3 · PLAN ------------------------------------------------------- -->
@@ -170,35 +172,56 @@
         <div id="planContent"></div>
       </section>
 
-      <!-- 4 · GROCERIES -------------------------------------------------- -->
+      <!-- 4 · COACH ------------------------------------------------------ -->
+      <section id="screen-coach" class="screen" hidden>
+        <h2>Food coach</h2>
+        <p class="lede">Tell me what you're eating — I'll read it and say how to eat it.</p>
+
+        <form class="card coach-input" id="coachForm" autocomplete="off">
+          <label class="sr-only" for="coachInput">What did you eat?</label>
+          <div class="coach-row">
+            <input id="coachInput" type="text" enterkeyhint="send"
+                   placeholder="e.g. 2 samosa and 1 cup chai"
+                   aria-describedby="coachHint">
+            <button class="mic" type="button" id="coachMic" hidden aria-label="Say it instead">🎤</button>
+            <button class="btn btn-slim" type="submit">Read it</button>
+          </div>
+          <div class="chips coach-chips" id="coachChips"></div>
+          <p class="hint" id="coachHint">Add a quantity if you can: “2 idli”, “1 katori rice”, “1 packet chips”. Estimates only.</p>
+        </form>
+
+        <div id="coachContent"></div>
+      </section>
+
+      <!-- 5 · GROCERIES -------------------------------------------------- -->
       <section id="screen-groceries" class="screen" hidden>
         <h2>Groceries</h2>
         <p class="lede">One week, one list. Costs are rough estimates.</p>
         <div id="groceryContent"></div>
       </section>
 
-      <!-- 5 · PREP ------------------------------------------------------- -->
+      <!-- 6 · PREP ------------------------------------------------------- -->
       <section id="screen-prep" class="screen" hidden>
         <h2>Prep</h2>
         <p class="lede">A little Sunday effort makes the week kinder.</p>
         <div id="prepContent"></div>
       </section>
 
-      <!-- 6 · ACTIVITY --------------------------------------------------- -->
+      <!-- 7 · ACTIVITY --------------------------------------------------- -->
       <section id="screen-activity" class="screen" hidden>
         <h2>Activity</h2>
         <p class="lede">Movement you enjoy beats movement you dread.</p>
         <div id="activityContent"></div>
       </section>
 
-      <!-- 7 · PROGRESS --------------------------------------------------- -->
+      <!-- 8 · PROGRESS --------------------------------------------------- -->
       <section id="screen-progress" class="screen" hidden>
         <h2>Progress</h2>
         <p class="lede">Trends over weeks. Never one bad day.</p>
         <div id="progressContent"></div>
       </section>
 
-      <!-- 8 · REMINDERS -------------------------------------------------- -->
+      <!-- 9 · REMINDERS -------------------------------------------------- -->
       <section id="screen-reminders" class="screen" hidden>
         <h2>Reminders</h2>
         <p class="lede">Gentle nudges, not alarms. You can switch any off.</p>
@@ -215,17 +238,18 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <nav class="tabbar" id="tabbar" aria-label="Main navigation">
-    <button type="button" data-screen="setup"      class="tab"><span class="tab-icon" aria-hidden="true">👤</span><span>Setup</span></button>
-    <button type="button" data-screen="targets"    class="tab"><span class="tab-icon" aria-hidden="true">🎯</span><span>Targets</span></button>
-    <button type="button" data-screen="plan"       class="tab"><span class="tab-icon" aria-hidden="true">🍽️</span><span>Plan</span></button>
-    <button type="button" data-screen="groceries"  class="tab"><span class="tab-icon" aria-hidden="true">🛒</span><span>Food</span></button>
-    <button type="button" data-screen="prep"       class="tab"><span class="tab-icon" aria-hidden="true">🥘</span><span>Prep</span></button>
-    <button type="button" data-screen="activity"   class="tab"><span class="tab-icon" aria-hidden="true">🚶</span><span>Move</span></button>
+    <button type="button" data-screen="coach"      class="tab"><span class="tab-icon" aria-hidden="true">🍴</span><span>Coach</span></button>
+    <button type="button" data-screen="plan"       class="tab"><span class="tab-icon" aria-hidden="true">📅</span><span>Plan</span></button>
     <button type="button" data-screen="progress"   class="tab"><span class="tab-icon" aria-hidden="true">📈</span><span>Progress</span></button>
+    <button type="button" data-screen="groceries"  class="tab"><span class="tab-icon" aria-hidden="true">🛒</span><span>Food</span></button>
+    <button type="button" data-screen="activity"   class="tab"><span class="tab-icon" aria-hidden="true">🚶</span><span>Move</span></button>
+    <button type="button" data-screen="prep"       class="tab"><span class="tab-icon" aria-hidden="true">🥘</span><span>Prep</span></button>
+    <button type="button" data-screen="targets"    class="tab"><span class="tab-icon" aria-hidden="true">🎯</span><span>Targets</span></button>
     <button type="button" data-screen="reminders"  class="tab"><span class="tab-icon" aria-hidden="true">🔔</span><span>Nudges</span></button>
   </nav>
 
   <script src="data.js"></script>
+  <script src="coach-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -2,12 +2,14 @@
    It keeps the app shell on the phone so it opens without a network.
    Bump CACHE_NAME when you change files, so old copies are replaced. */
 
-const CACHE_NAME = 'thali-coach-v4';
+const CACHE_NAME = 'thali-coach-v5';
 const FILES = [
   './index.html',
   './style.css',
+  './coach.css',
   './app.js',
   './data.js',
+  './coach-data.js',
   './manifest.json',
   './icon.svg',
   './icon-192.png',

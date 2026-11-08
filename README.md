@@ -20,6 +20,29 @@ Then open <http://localhost:8000> on your computer, or on your phone using your
 computer's local IP on the same Wi‑Fi. Notifications and “Install app” need
 `http://localhost` or `https://`.
 
+## Food coach (new)
+
+The **Coach** tab takes plain words — “2 samosa and 1 cup chai”, “1 katori
+rice, dal and curd”, “one packet chips” — or your voice (Chrome/Android speech
+input), and replies with:
+
+- what it recognised and a rough calorie/protein/fibre estimate,
+- how to eat it (fibre first, slow start, water),
+- what to add so you are not hungry in an hour,
+- what to swap for a lighter version of the same craving,
+- what happens **if you ate it every day** (shown as maths, not a promise),
+- Add to today / Ignore.
+
+Saved food entries appear as a running log on the Coach tab and as a summary on
+Progress. In healthy-habits mode every calorie number is hidden and only portion
+advice is shown.
+
+It is deliberately offline and rule-based: a fixed food table in
+`coach-data.js`, a small parser in `app.js`, no AI service, no API key and
+nothing sent off the phone. That means it handles common Indian foods and
+snacks, not arbitrary photos. Photo recognition would need an online vision
+model (and therefore a backend/API key), so it is not included.
+
 ## Android app (APK)
 
 `download/thali-coach.apk` is a signed sideload build — no Play Store needed.
@@ -45,10 +68,12 @@ Reminders tab can only show in-app nudges.
 
 | File | What it does |
 | --- | --- |
-| `index.html` | The 8 screens and bottom tab bar. |
+| `index.html` | The 9 screens and bottom tab bar. |
 | `style.css` | Mint/leaf/turmeric theme, light + dark mode, 360 px friendly. |
+| `coach.css` | Food-coach screen styles. |
 | `data.js` | Food table, 7-day plan, groceries, prep, activity content. **Edit food or prices here.** |
-| `app.js` | Calculator, plan builder, localStorage, reminders, chart. |
+| `coach-data.js` | Snacks/outside-food table, aliases, quick chips, lighter swaps. |
+| `app.js` | Calculator, plan builder, coach parser/advice, localStorage, reminders, chart. |
 | `manifest.json` | Makes it installable on a phone. |
 | `sw.js` | Tiny service worker for offline use (network first, cache backup). |
 | `icon.svg` | App icon. |

@@ -23,7 +23,7 @@ const MEALS = [
   { key: 'snack',     label: 'Snack',     icon: '🍎' },
   { key: 'dinner',    label: 'Dinner',    icon: '🌙' }
 ];
-const SCREENS = ['setup', 'targets', 'plan', 'groceries', 'prep', 'activity', 'progress', 'reminders'];
+const SCREENS = ['setup', 'targets', 'plan', 'coach', 'groceries', 'prep', 'activity', 'progress', 'reminders'];
 const FLOORS = { female: 1200, male: 1500, other: 1200 };
 
 /* Activity level -> multiplier for maintenance calories, plus step/walk goals. */
@@ -443,6 +443,7 @@ function renderAll() {
   updateBadge();
   renderTargets();
   renderPlan();
+  renderCoach();
   renderGroceries();
   renderPrep();
   renderActivity();
@@ -928,6 +929,573 @@ function renderActivity() {
     </details>`;
 }
 
+/* -------------------------------- COACH --------------------------------- */
+
+const QTY_WORDS = {
+  a: 1, an: 1, one: 1, ek: 1, two: 2, do: 2, three: 3, teen: 3, four: 4, char: 4,
+  five: 5, paanch: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  half: 0.5, aadha: 0.5, quarter: 0.25, couple: 2, few: 3, some: 1
+};
+
+const UNIT_ALIASES = {
+  katori: 'katori', katoris: 'katori', bowl: 'katori', bowls: 'katori',
+  cup: 'cup', cups: 'cup', mug: 'cup', mugs: 'cup',
+  plate: 'plate', plates: 'plate', glass: 'glass', glasses: 'glass',
+  piece: 'piece', pieces: 'piece', pc: 'piece', pcs: 'piece',
+  slice: 'slice', slices: 'slice',
+  tsp: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp',
+  tbsp: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp',
+  spoon: 'spoon', spoons: 'spoon',
+  handful: 'handful', handfuls: 'handful',
+  packet: 'packet', packets: 'packet', pack: 'packet', packs: 'packet',
+  scoop: 'scoop', scoops: 'scoop',
+  g: 'g', gm: 'g', gms: 'g', gram: 'g', grams: 'g',
+  ml: 'ml', l: 'l', litre: 'l', liter: 'l'
+};
+
+/* Alias list, longest phrase first so "masala dosa" beats "dosa". */
+const ALIAS_LIST = Object.keys(FOOD_ALIASES)
+  .map((alias) => ({ alias: alias, key: FOOD_ALIASES[alias], words: alias.split(' ').length }))
+  .sort((a, b) => b.alias.length - a.alias.length);
+
+let coachDraft = null;
+let coachSwap = null;
+
+function coachFood(key) {
+  if (FOODS[key]) {
+    const f = FOODS[key];
+    return {
+      key: key, name: f.name, unit: f.unit, unitG: f.unitG, ml: !!f.ml, dairy: !!f.dairy,
+      perKcal: (f.kcal / 100) * f.unitG,
+      perP: (f.p / 100) * f.unitG, perC: (f.c / 100) * f.unitG,
+      perF: (f.f / 100) * f.unitG, perFib: (f.fib / 100) * f.unitG,
+      tags: []
+    };
+  }
+  const e = EXTRAS[key];
+  if (!e) return null;
+  return {
+    key: key, name: e.name, unit: e.unit, unitG: e.unitG, ml: !!e.ml, dairy: !!e.dairy,
+    perKcal: e.kcal, perP: e.p, perC: e.c, perF: e.f, perFib: e.fib,
+    tags: e.tags || []
+  };
+}
+
+/* Turn "2 katori" into grams. Units that do not match the food fall back
+   to sensible household sizes. */
+function portionGrams(info, qty, unit) {
+  if (!unit) return qty * info.unitG;
+  if (unit === 'g' || unit === 'ml') return qty;
+  if (unit === 'l') return qty * 1000;
+  if (unit === 'katori' || unit === 'cup') {
+    if (info.unit === 'katori' || info.unit === 'cup') return qty * info.unitG;
+    return qty * (unit === 'cup' ? 200 : 150);
+  }
+  if (unit === 'glass') return qty * (info.unit === 'glass' ? info.unitG : 200);
+  if (unit === 'plate') return qty * (info.unit === 'plate' ? info.unitG : 300);
+  if (unit === 'tsp') return qty * 5;
+  if (unit === 'tbsp' || unit === 'spoon') return qty * 15;
+  if (unit === 'handful') return qty * (info.unit === 'handful' ? info.unitG : 30);
+  if (unit === 'packet') return qty * (info.unit === 'packet' ? info.unitG : 30);
+  if (unit === 'slice') return qty * (info.unit === 'slice' ? info.unitG : 30);
+  if (unit === 'scoop') return qty * (info.unit === 'scoop' ? info.unitG : 60);
+  return qty * info.unitG; /* piece, dosa, roti, biscuit ... */
+}
+
+function parseSegment(seg) {
+  const tokens = seg.replace(/[.,!?]/g, ' ').split(/\s+/).filter(Boolean);
+  let qty = null;
+  let unit = null;
+  let i = 0;
+
+  if (tokens.length >= 3 && /^\d+$/.test(tokens[0]) && tokens[1] === '/' && /^\d+$/.test(tokens[2])) {
+    qty = parseInt(tokens[0], 10) / parseInt(tokens[2], 10);
+    i = 3;
+  } else if (tokens.length && /^\d+(\/\d+)?$/.test(tokens[0])) {
+    const parts = tokens[0].split('/');
+    qty = parts.length === 2 ? parseInt(parts[0], 10) / parseInt(parts[1], 10) : parseInt(parts[0], 10);
+    i = 1;
+  } else if (tokens.length && QTY_WORDS[tokens[0]] != null) {
+    qty = QTY_WORDS[tokens[0]];
+    i = 1;
+  }
+  if (i < tokens.length && UNIT_ALIASES[tokens[i]]) {
+    unit = UNIT_ALIASES[tokens[i]];
+    i += 1;
+  }
+
+  const words = tokens.slice(i);
+  if (!words.length) return [];
+
+  let phrase = ' ' + words.join(' ') + ' ';
+  const items = [];
+
+  for (let guard = 0; guard < 5; guard += 1) {
+    let hit = null;
+    for (let a = 0; a < ALIAS_LIST.length; a += 1) {
+      const entry = ALIAS_LIST[a];
+      if (phrase.indexOf(' ' + entry.alias + ' ') !== -1) { hit = entry; break; }
+    }
+    if (!hit) break;
+    items.push({ key: hit.key, qty: qty == null ? 1 : qty, unit: unit });
+    phrase = phrase.replace(' ' + hit.alias + ' ', ' ');
+    qty = null; /* only the first food takes the spoken quantity */
+    unit = null;
+  }
+
+  if (!items.length) {
+    return [{ key: null, name: words.join(' '), qty: qty == null ? 1 : qty, unit: unit || 'katori' }];
+  }
+  return items;
+}
+
+function parseFoodText(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return [];
+  const segments = raw.toLowerCase()
+    .replace(/½/g, ' half ')
+    .replace(/¼/g, ' quarter ')
+    .replace(/[–—]/g, '-')
+    .replace(/\bplus\b|\band\b|\bwith\b|[+,;\/\n]/g, '|')
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const items = [];
+  segments.forEach((seg) => {
+    parseSegment(seg).forEach((item) => items.push(item));
+  });
+  return items.slice(0, 8);
+}
+
+function nutritionForItem(item) {
+  if (!item.key) {
+    /* Unknown food: give a visible, deliberately rough middle guess. */
+    const grams = portionGrams({ unit: 'katori', unitG: 150 }, item.qty, item.unit);
+    const units = grams / 150;
+    return {
+      key: null, name: item.name, qty: item.qty, unit: item.unit, grams: grams,
+      kcal: 180 * units, p: 5 * units, c: 22 * units, f: 7 * units, fib: 2 * units,
+      tags: [], unknown: true
+    };
+  }
+  const info = coachFood(item.key);
+  if (!info) return null;
+  const grams = portionGrams(info, item.qty, item.unit);
+  const units = info.unitG ? grams / info.unitG : item.qty;
+  return {
+    key: item.key, name: info.name, qty: item.qty, unit: item.unit || info.unit,
+    grams: grams, kcal: info.perKcal * units, p: info.perP * units,
+    c: info.perC * units, f: info.perF * units, fib: info.perFib * units,
+    tags: info.tags, dairy: info.dairy, unknown: false
+  };
+}
+
+function foodLogToday() {
+  const log = getLog(todayKey());
+  return Array.isArray(log.foods) ? log.foods : [];
+}
+function foodKcalToday() {
+  return foodLogToday().reduce((sum, e) => sum + (e.kcal || 0), 0);
+}
+
+function analyzeFood(text) {
+  const items = parseFoodText(text).map(nutritionForItem).filter(Boolean);
+  const totals = items.reduce((t, i) => ({
+    kcal: t.kcal + i.kcal, p: t.p + i.p, c: t.c + i.c,
+    f: t.f + i.f, fib: t.fib + i.fib
+  }), { kcal: 0, p: 0, c: 0, f: 0, fib: 0 });
+
+  const t = state.targets;
+  const allowed = t && t.mode !== 'habits';
+  const before = foodKcalToday();
+  const leftAfter = allowed ? (t.target - before - totals.kcal) : null;
+
+  const swap = bestSwap(items, allowed);
+  return { text: text, items: items, totals: totals, leftAfter: leftAfter, allowed: allowed, swap: swap };
+}
+
+function bestSwap(items, allowed) {
+  if (!allowed) return null;
+  let best = null;
+  items.forEach((item) => {
+    if (!item.key || !COACH_SWAPS[item.key]) return;
+    const plan = COACH_SWAPS[item.key];
+    const alt = nutritionForItem({ key: plan.to, qty: plan.qty, unit: null });
+    if (!alt) return;
+    const saved = item.kcal - alt.kcal;
+    if (saved > 30 && (!best || saved > best.saved)) {
+      best = { from: item, to: alt, saved: saved, label: plan.label };
+    }
+  });
+  return best;
+}
+
+function coachHoursNow() {
+  return new Date().getHours();
+}
+
+function adviceFor(draft) {
+  const tags = {};
+  draft.items.forEach((i) => (i.tags || []).forEach((t) => { tags[t] = true; }));
+  const hour = coachHoursNow();
+  const out = [];
+
+  if (tags.fried) {
+    out.push({
+      title: 'Fried today',
+      body: 'Fried food is easy to over-eat because it is soft and salty. One is a treat, three is a meal. Put curd, sprouts or salad next to it and eat those first.'
+    });
+  }
+  if (tags.drink) {
+    out.push({
+      title: 'Liquid sugar',
+      body: 'A sugary drink does not switch off hunger. A 250 ml glass is roughly 6 teaspoons of sugar. Chaas, nimbu pani without sugar, or plain water do the same job better.'
+    });
+  }
+  if (tags.sweet) {
+    out.push({
+      title: 'Sweet timing',
+      body: 'Eat sweets straight after a meal rather than alone on an empty stomach — the rise in blood sugar is gentler. A 10–15 minute walk afterwards helps too.'
+    });
+  }
+  if (tags.refined) {
+    out.push({
+      title: 'Refined flour',
+      body: 'Maida items digest fast and leave you hungry again in an hour. Add a protein (curd, egg, chana, paneer) so the meal actually holds.'
+    });
+  }
+  if (tags.salty) {
+    out.push({
+      title: 'Salt load',
+      body: 'Salty snacks can show up on the scale tomorrow as water, not fat. Drink water through the day and add a banana or some curd for potassium.'
+    });
+  }
+  if ((tags.chai || (draft.items.some((i) => i.key === 'chai'))) && hour >= 16) {
+    out.push({
+      title: 'Late caffeine',
+      body: 'Chai or coffee after 4 pm can still be in your system at bedtime. If sleep is already patchy, make this the last one.'
+    });
+  }
+
+  const item = draft.items[0];
+  if (item && item.key === 'chai' && hour >= 16) { /* covered above */ }
+
+  if (hour >= 21 && draft.totals.kcal > 200) {
+    out.push({
+      title: 'Close to bedtime',
+      body: 'Keep late eating small and leave about two hours before lying down, especially if you get acidity or reflux.'
+    });
+  }
+
+  if (!out.length) {
+    out.push({
+      title: 'This is a steady choice',
+      body: 'Nothing here needs fixing. Eat it slowly and stop when you are comfortable rather than full.'
+    });
+  }
+  return out.slice(0, 4);
+}
+
+function addSuggestions(draft) {
+  const out = [];
+  const t = draft.totals;
+  const proteinLow = t.p < 8;
+  const fibreLow = t.fib < 3;
+
+  if (proteinLow) out.push('Add a protein so you are not hungry in an hour: 1 katori curd, 1 boiled egg, or a handful of roasted chana.');
+  if (fibreLow) out.push('Add fibre: cucumber–tomato salad, a fruit, or a bowl of sprouts.');
+  if (draft.items.some((i) => i.unit === 'packet' || i.unit === 'bar')) out.push('Portion it out on a plate and put the packet away — you will eat noticeably less without thinking about it.');
+  if (draft.items.length > 3) out.push('Three or more items at once usually means a meal, not a snack. That is fine — just count it as one and keep the next meal simple.');
+  if (!out.length) out.push('Nothing to add. Carry on.');
+  return out.slice(0, 3);
+}
+
+function habitMaths(draft) {
+  if (!draft.allowed) {
+    return 'One snack never decides anything. Keep the next meal simple and protein-led, and go back to your usual routine.';
+  }
+  if (draft.leftAfter == null || draft.leftAfter >= 0) {
+    return 'Today this fits inside your estimate, so there is no maths to do. One food never decides anything.';
+  }
+  const extra = Math.round(-draft.leftAfter);
+  const perMonth = (extra * 30) / 7700;
+  const walks = Math.ceil(extra / 90);
+  return `If you ate this every single day on top of your plan, that is about ${num(extra)} extra kcal a day — roughly ${perMonth.toFixed(1)} kg a month of trend. That is maths, not a promise: bodies adapt and you will not follow it exactly. One ${walks > 1 ? walks + ' × ' : ''}20-minute walk covers a fair slice of it.`;
+}
+
+function coachVerdict(draft) {
+  if (!draft.allowed) {
+    const heavy = draft.totals.kcal > 350;
+    return {
+      tone: 'calm',
+      text: heavy
+        ? 'This is on the heavier side. Not a problem — just keep the next meal simple and protein-led.'
+        : 'A light choice. Nothing to fix here.'
+    };
+  }
+  if (draft.leftAfter >= 0) {
+    return {
+      tone: 'good',
+      text: `Fits — about ${num(draft.totals.kcal)} kcal, leaving roughly ${num(draft.leftAfter)} kcal in today's estimate.`
+    };
+  }
+  return {
+    tone: 'warn',
+    text: `About ${num(draft.totals.kcal)} kcal — roughly ${num(-draft.leftAfter)} kcal past today's estimate. Not a failure. Make the next meal protein and vegetables, and skip the "make up for it" idea.`
+  };
+}
+
+function coachItemLine(item) {
+  const qty = item.qty === 1 ? '' : `${item.qty} × `;
+  const name = item.unknown ? `${esc(item.name)} <span class="coach-unknown">not in my table</span>` : esc(item.name);
+  const right = coachDraft && coachDraft.allowed
+    ? `<span class="coach-kcal">${num(item.kcal)} kcal</span>`
+    : '';
+  return `<li><span>${qty}${name}</span>${right}</li>`;
+}
+
+function coachCard(draft) {
+  const verdict = coachVerdict(draft);
+  const advice = adviceFor(draft);
+  const adds = addSuggestions(draft);
+  const allowed = draft.allowed;
+
+  const totalsLine = allowed
+    ? `<div class="coach-total"><span>Total</span><b>${num(draft.totals.kcal)} kcal</b><span class="muted">≈ ${Math.round(draft.totals.p)} g protein · ${draft.totals.fib.toFixed(1)} g fibre</span></div>`
+    : `<div class="coach-total"><span>Total</span><b>portion advice only</b><span class="muted">healthy-habits mode hides calories</span></div>`;
+
+  const swapBlock = draft.swap
+    ? `<div class="coach-swap">
+        <h4>A lighter swap</h4>
+        <p>${esc(draft.swap.from.name)} → ${esc(draft.swap.label)}. About <b>${num(draft.swap.saved)} kcal less</b>, and more protein or fibre in most cases.</p>
+      </div>`
+    : '';
+
+  return `<div class="card coach-card" id="coachResult">
+    <div class="meal-head">
+      <h3>Here's the read</h3>
+      <span class="pill ${verdict.tone === 'warn' ? 'warn' : (verdict.tone === 'good' ? 'good' : '')}">${verdict.tone === 'warn' ? 'over today' : (verdict.tone === 'good' ? 'fits' : 'gentle')}</span>
+    </div>
+    <ul class="coach-items">${draft.items.map(coachItemLine).join('')}</ul>
+    ${totalsLine}
+    <p class="coach-verdict">${verdict.text}</p>
+
+    <h4>How to eat it</h4>
+    <ul class="ticks small">
+      <li>Eat the fibre first — salad, vegetables or fruit — then the protein, then the carb or sweet.</li>
+      <li>Slow down for the first five minutes. Put the phone down; you will notice fullness sooner.</li>
+      <li>Water through the day, not three glasses at one go.</li>
+    </ul>
+
+    ${advice.map((a) => `<h4>${esc(a.title)}</h4><p class="small">${esc(a.body)}</p>`).join('')}
+
+    <h4>Add / keep</h4>
+    <ul class="ticks small">${adds.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
+
+    ${swapBlock}
+
+    <h4>If this becomes a habit</h4>
+    <p class="small">${esc(habitMaths(draft))}</p>
+
+    <div class="coach-actions">
+      <button class="btn" type="button" data-coach="save">Add to today</button>
+      ${draft.swap ? '<button class="btn btn-ghost" type="button" data-coach="swap">Use lighter swap</button>' : ''}
+      <button class="btn btn-ghost" type="button" data-coach="clear">Ignore</button>
+    </div>
+    <p class="hint">Fixed food table, rough estimates. You decide what to do with it.</p>
+  </div>`;
+}
+
+function emptyCoachCard() {
+  return `<div class="card calm coach-empty">
+    <h3>Say it in plain words</h3>
+    <p>“2 samosa and 1 cup chai” · “1 katori rice, dal and curd” · “one packet chips”.</p>
+    <p class="small muted">I will estimate the calories, tell you how to eat it, and suggest what to add, swap or skip. Nothing is sent anywhere — it all stays on this phone.</p>
+  </div>`;
+}
+
+function todayFoodCard(entries, allowed) {
+  if (!entries.length) {
+    return `<div class="card">
+      <h3>Today's food log</h3>
+      <p class="hint">Nothing logged yet. Anything you add above shows up here with the running total.</p>
+    </div>`;
+  }
+  const total = entries.reduce((s, e) => s + e.kcal, 0);
+  const target = state.targets && state.targets.target ? state.targets.target : null;
+  const pill = allowed && target
+    ? `<span class="pill">${num(total)} / ${num(target)} kcal</span>`
+    : `<span class="pill">${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}</span>`;
+
+  const rows = entries.slice().reverse().map((e) => `<li class="coach-log-row">
+      <div>
+        <b>${esc(e.text)}</b>
+        <span class="muted small">${e.items.map((i) => esc(i.name)).join(', ')} · ${esc(e.at)}</span>
+      </div>
+      <div class="coach-log-right">
+        ${allowed ? `<span>${num(e.kcal)}</span>` : ''}
+        <button class="icon-btn" type="button" data-coach-del="${esc(e.id)}" aria-label="Delete ${esc(e.text)}">✕</button>
+      </div>
+    </li>`).join('');
+
+  return `<div class="card">
+    <div class="meal-head"><h3>Today's food log</h3>${pill}</div>
+    <ul class="coach-log">${rows}</ul>
+    <p class="hint">${allowed && target
+      ? `About ${num(Math.max(0, target - total))} kcal left in today's estimate.`
+      : 'Calories are hidden in healthy-habits mode.'}</p>
+  </div>`;
+}
+
+function renderCoach() {
+  const box = $('#coachContent');
+  if (!box) return;
+  if (!state.profile || !state.targets) { box.innerHTML = needSetupHtml(); return; }
+
+  const chips = $('#coachChips');
+  if (chips && !chips.dataset.built) {
+    chips.innerHTML = COACH_CHIPS
+      .map((c) => `<button type="button" class="chip" data-quick="${esc(c.text)}">${esc(c.label)}</button>`)
+      .join('');
+    chips.dataset.built = '1';
+  }
+
+  const allowed = state.targets.mode !== 'habits';
+  box.innerHTML = (coachDraft ? coachCard(coachDraft) : emptyCoachCard())
+    + todayFoodCard(foodLogToday(), allowed);
+}
+
+function analyzeCoachInput() {
+  const input = $('#coachInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) { toast('Type what you ate first.'); input.focus(); return; }
+
+  const draft = analyzeFood(text);
+  if (!draft.items.length) {
+    toast('I could not find a food there. Try “2 idli and chutney”.');
+    return;
+  }
+  coachDraft = draft;
+  saveCoachDraft();
+  renderCoach();
+  const card = $('#coachResult');
+  if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+/* Keep the draft across tab switches, but never across days. */
+function saveCoachDraft() {
+  state.coachDraft = coachDraft ? { text: coachDraft.text, day: todayKey() } : null;
+  save();
+}
+function restoreCoachDraft() {
+  if (state.coachDraft && state.coachDraft.day === todayKey() && state.coachDraft.text) {
+    coachDraft = analyzeFood(state.coachDraft.text);
+  }
+}
+
+function logFoodDraft(draft) {
+  const log = getLog(todayKey());
+  if (!Array.isArray(log.foods)) log.foods = [];
+  log.foods.push({
+    id: 'f' + Date.now() + Math.random().toString(36).slice(2, 6),
+    text: draft.text,
+    items: draft.items.map((i) => ({ name: i.name, qty: i.qty, unit: i.unit, kcal: Math.round(i.kcal) })),
+    kcal: Math.round(draft.totals.kcal),
+    p: Math.round(draft.totals.p),
+    fib: Number(draft.totals.fib.toFixed(1)),
+    at: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+  });
+  save();
+  /* Ticking the meal box is optional, but it keeps the streak honest. */
+  if (log.meals) log.meals.snack = true;
+  coachDraft = null;
+  state.coachDraft = null;
+  save();
+  const input = $('#coachInput');
+  if (input) input.value = '';
+  renderCoach();
+  toast('Added to today 🍽️');
+}
+
+function useSwapDraft() {
+  if (!coachDraft || !coachDraft.swap) return;
+  const alt = coachDraft.swap.to;
+  logFoodDraft({
+    text: coachDraft.swap.label,
+    items: [alt],
+    totals: { kcal: alt.kcal, p: alt.p, c: alt.c, f: alt.f, fib: alt.fib },
+    allowed: coachDraft.allowed
+  });
+  toast('Lighter swap logged 🌿');
+}
+
+function wireCoach() {
+  const form = $('#coachForm');
+  if (form) form.addEventListener('submit', (e) => { e.preventDefault(); analyzeCoachInput(); });
+
+  const chips = $('#coachChips');
+  if (chips) {
+    chips.addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-quick]');
+      if (!chip) return;
+      const input = $('#coachInput');
+      input.value = chip.dataset.quick;
+      analyzeCoachInput();
+    });
+  }
+
+  const box = $('#coachContent');
+  if (box) {
+    box.addEventListener('click', (e) => {
+      const del = e.target.closest('[data-coach-del]');
+      if (del) {
+        const log = getLog(todayKey());
+        log.foods = (log.foods || []).filter((f) => f.id !== del.dataset.coachDel);
+        save();
+        renderCoach();
+        return;
+      }
+      const btn = e.target.closest('[data-coach]');
+      if (!btn) return;
+      const action = btn.dataset.coach;
+      if (action === 'save' && coachDraft) logFoodDraft(coachDraft);
+      else if (action === 'swap') useSwapDraft();
+      else if (action === 'clear') {
+        coachDraft = null;
+        state.coachDraft = null;
+        save();
+        const input = $('#coachInput');
+        if (input) input.value = '';
+        renderCoach();
+        toast('Ignored — nothing logged.');
+      }
+    });
+  }
+
+  const mic = $('#coachMic');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (mic && SR) {
+    const rec = new SR();
+    rec.lang = 'en-IN';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    mic.hidden = false;
+    mic.addEventListener('click', () => {
+      try { rec.start(); mic.classList.add('listening'); } catch (err) { /* already running */ }
+    });
+    rec.onresult = (e) => {
+      const input = $('#coachInput');
+      input.value = e.results[0][0].transcript;
+      mic.classList.remove('listening');
+      analyzeCoachInput();
+    };
+    rec.onerror = () => { mic.classList.remove('listening'); toast('Could not hear that. Type it instead.'); };
+    rec.onend = () => mic.classList.remove('listening');
+  }
+}
+
 /* ------------------------------ PROGRESS -------------------------------- */
 
 function waterGoal() {
@@ -1035,6 +1603,8 @@ function renderProgress() {
       <p class="hint">A nudge, not a score. No shame if a meal is missed.</p>
     </div>
 
+    ${progressFoodCard()}
+
     ${weightBlock}
 
     <div class="card calm">
@@ -1046,6 +1616,36 @@ function renderProgress() {
         <li>If things stall for 3–4 weeks, adjust one portion — not the whole plan.</li>
       </ul>
     </div>`;
+}
+
+function progressFoodCard() {
+  const entries = foodLogToday();
+  const allowed = state.targets && state.targets.mode !== 'habits';
+  const total = entries.reduce((s, e) => s + (e.kcal || 0), 0);
+  const target = state.targets && state.targets.target ? state.targets.target : null;
+
+  if (!entries.length) {
+    return `<div class="card">
+      <div class="meal-head"><h3>Food coach</h3></div>
+      <p class="hint">Nothing captured yet. Tell the coach what you ate and it will estimate the calories and suggest what to add, swap or skip.</p>
+      <p><button type="button" class="btn btn-ghost btn-slim" data-go="coach">Open food coach</button></p>
+    </div>`;
+  }
+
+  const last = entries[entries.length - 1];
+  const pill = allowed && target
+    ? `<span class="pill">${num(total)} / ${num(target)} kcal</span>`
+    : `<span class="pill">${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}</span>`;
+
+  return `<div class="card">
+    <div class="meal-head"><h3>Food coach</h3>${pill}</div>
+    <p class="small"><b>${esc(last.text)}</b><br><span class="muted">${
+      allowed && target
+        ? `About ${num(Math.max(0, target - total))} kcal left in today's estimate.`
+        : 'Calories hidden in healthy-habits mode.'
+    }</span></p>
+    <p><button type="button" class="btn btn-ghost btn-slim" data-go="coach">Open food coach</button></p>
+  </div>`;
 }
 
 function weightSummary() {
@@ -1259,6 +1859,7 @@ function showScreen(name) {
     setup: prefillSetup,
     targets: renderTargets,
     plan: function () { renderDayTabs(); renderPlan(); },
+    coach: renderCoach,
     groceries: renderGroceries,
     prep: renderPrep,
     activity: renderActivity,
@@ -1398,6 +1999,8 @@ function wireStatic() {
     if (e.target.id === 'testNotify') testNotification();
     if (e.target.id === 'installBtn') installApp();
   });
+
+  wireCoach();
 }
 
 function startScheduler() {
@@ -1445,6 +2048,7 @@ function init() {
   syncPregnancyRow();
 
   state.selectedDay = defaultDayName();
+  restoreCoachDraft();
 
   renderAll();
   showScreen(state.profile ? 'plan' : 'setup');
