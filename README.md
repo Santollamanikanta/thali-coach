@@ -60,6 +60,17 @@ powershell -ExecutionPolicy Bypass -File C:\Users\DELL\thali-coach-android\build
 That script copies the web files in, then runs `aapt2` → `javac` → `d8` →
 `zipalign` → `apksigner` and drops the finished APK into `download/`.
 
+### Google Play bundle (AAB)
+
+`download/thali-coach.aab` is the signed Play upload bundle (version 2 / 1.1).
+It is built without Gradle by `C:\Users\DELL\thali-coach-android\build-aab.ps1`
+(`aapt2 --proto-format` → `javac` → `d8` → module zip → `bundletool` →
+`jarsigner`). Download `bundletool-all-<version>.jar` into that folder first.
+
+Everything needed for the store listing — copy, graphics, data-safety answers,
+content rating and a Console walkthrough — is in
+[`play-store/listing.md`](play-store/listing.md).
+
 Limits of the shell: the app's own service worker is disabled inside it (so
 updates are never stale) and browser notifications are unavailable, so the
 Reminders tab can only show in-app nudges.
@@ -75,6 +86,7 @@ Reminders tab can only show in-app nudges.
 | `coach-data.js` | Snacks/outside-food table, aliases, quick chips, lighter swaps. |
 | `app.js` | Calculator, plan builder, coach parser/advice, localStorage, reminders, chart. |
 | `manifest.json` | Makes it installable on a phone. |
+| `privacy.html` | Plain-language privacy policy + health disclaimer (also the Play Store URL). |
 | `sw.js` | Tiny service worker for offline use (network first, cache backup). |
 | `icon.svg` | App icon. |
 | `serve.js` | Optional local test server (Node, no packages). |
