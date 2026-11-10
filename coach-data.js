@@ -160,6 +160,23 @@ const COACH_CHIPS = [
   { label: 'Idli',          text: '2 idli' }
 ];
 
+/* Quick taps shown under a plate photo. The app cannot name food from
+   pixels offline, so the photo is a memory aid and the words do the reading. */
+const PHOTO_PICKS = [
+  { label: '2 idli',        text: '2 idli' },
+  { label: '1 dosa',        text: '1 dosa' },
+  { label: '1 katori rice', text: '1 katori rice' },
+  { label: '1 katori dal',  text: '1 katori dal' },
+  { label: '2 roti',        text: '2 roti' },
+  { label: '1 katori sabzi',text: '1 katori sabzi' },
+  { label: '1 katori curd', text: '1 katori curd' },
+  { label: '1 cup chai',    text: '1 cup chai' },
+  { label: '1 samosa',      text: '1 samosa' },
+  { label: '1 packet chips',text: '1 packet chips' },
+  { label: '1 banana',      text: '1 banana' },
+  { label: '1 egg',         text: '1 egg' }
+];
+
 /* Snack swaps shown when a choice is heavy. */
 const COACH_SWAPS = {
   samosa:        { to: 'roasted_chana', qty: 1, label: 'a handful of roasted chana' },

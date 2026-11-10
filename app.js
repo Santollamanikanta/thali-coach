@@ -84,7 +84,9 @@ function defaultState() {
     prepChecks: {},
     reminders: DEFAULT_REMINDERS.map((r) => ({ ...r })),
     fired: {},
-    selectedDay: null
+    selectedDay: null,
+    selectedDate: null,
+    calMonth: null
   };
 }
 
@@ -113,13 +115,106 @@ function save() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
   } catch (err) {
-    console.warn('Could not save. Storage may be full or blocked.', err);
+    /* Photos are the only big items here. Drop the oldest and retry once. */
+    try {
+      prunePhotos(true);
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    } catch (err2) {
+      console.warn('Could not save. Storage may be full or blocked.', err2);
+    }
   }
 }
 
 function getLog(key) {
   if (!state.logs[key]) state.logs[key] = { water: 0, meals: {}, activity: {} };
   return state.logs[key];
+}
+
+/* Photos live inside log entries as small JPEG data URLs. Keep only the
+   newest few so phone storage never fills up. */
+const PHOTO_KEEP = 12;
+let coachPhoto = null;
+
+function allLoggedFoods() {
+  const out = [];
+  Object.keys(state.logs).sort().forEach((k) => {
+    (state.logs[k].foods || []).forEach((f) => out.push(f));
+  });
+  return out;
+}
+
+function prunePhotos(aggressive) {
+  const withPhoto = allLoggedFoods().filter((f) => f.photo);
+  const keep = aggressive ? 4 : PHOTO_KEEP;
+  const extra = withPhoto.length - keep;
+  for (let i = 0; i < extra; i++) delete withPhoto[i].photo;
+}
+
+function foodOn(key) {
+  const log = state.logs[key];
+  return !!(log && Array.isArray(log.foods) && log.foods.length);
+}
+
+/* ------------------------------- PHOTOS ---------------------------------- */
+
+const PHOTO_MAX = 560;      /* longest side, in pixels */
+const PHOTO_QUALITY = 0.6;  /* JPEG quality: small enough to keep on the phone */
+
+/* Camera files are multi-megabyte. Shrink before storing, because
+   localStorage is the only database this app has. */
+function shrinkPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that photo.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('That file is not a photo.'));
+      img.onload = () => {
+        const scale = Math.min(1, PHOTO_MAX / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        try {
+          resolve(canvas.toDataURL('image/jpeg', PHOTO_QUALITY));
+        } catch (err) {
+          reject(new Error('Could not prepare that photo.'));
+        }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPhotoBox() {
+  const box = $('#coachPhotoBox');
+  if (!box) return;
+  if (!coachPhoto) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false;
+  box.innerHTML = `<div class="photo-preview">
+      <img src="${coachPhoto}" alt="The plate you photographed">
+      <button type="button" data-photo="remove" aria-label="Remove photo">✕</button>
+    </div>
+    <p class="photo-note"><b>What is on the plate?</b> Tap to add it below.
+      A phone cannot name food from a photo offline, so the photo is your memory aid and the words do the reading.</p>
+    <div class="chips photo-chips">${PHOTO_PICKS.map((p) =>
+      `<button type="button" class="chip" data-plate="${esc(p.text)}">${esc(p.label)}</button>`).join('')}</div>`;
+}
+
+function openPhotoView(src) {
+  const view = $('#photoView');
+  const img = $('#photoViewImg');
+  if (!view || !img || !src) return;
+  img.src = src;
+  view.hidden = false;
+}
+
+function closePhotoView() {
+  const view = $('#photoView');
+  if (view) view.hidden = true;
 }
 
 /* Small toast used for in-app reminders and confirmations. */
@@ -131,6 +226,79 @@ function toast(message) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 5500);
+}
+
+/* A tiny in-page confirm dialog. window.confirm is unreliable inside a
+   WebView, and a real sheet looks and behaves better on a phone. */
+let sheetYes = null;
+
+function askConfirm(opts) {
+  const sheet = $('#sheet');
+  if (!sheet) {
+    if (window.confirm(opts.title || 'Are you sure?')) opts.onYes();
+    return;
+  }
+  $('#sheetTitle').textContent = opts.title || 'Are you sure?';
+  $('#sheetText').textContent = opts.text || '';
+  $('#sheetYes').textContent = opts.yes || 'Yes';
+  $('#sheetYes').classList.toggle('danger', opts.danger !== false);
+  sheetYes = opts.onYes || null;
+  sheet.hidden = false;
+}
+
+function closeSheet() {
+  const sheet = $('#sheet');
+  if (sheet) sheet.hidden = true;
+  sheetYes = null;
+}
+
+/* Rebuild targets and the plan from the profile as it stands now. */
+function refreshPlan() {
+  if (!state.profile) { showScreen('setup'); return; }
+  state.targets = calcTargets(state.profile);
+  state.selectedDate = todayKey();
+  state.selectedDay = defaultDayName();
+  state.calMonth = monthKeyOf();
+  save();
+  renderAll();
+  showScreen('targets');
+  toast('Refreshed from your latest details.');
+}
+
+function resetToday() {
+  delete state.logs[todayKey()];
+  coachDraft = null;
+  coachPhoto = null;
+  state.coachDraft = null;
+  save();
+  const input = $('#coachInput');
+  if (input) input.value = '';
+  renderPhotoBox();
+  renderAll();
+  showScreen('progress');
+  toast('Today is blank again. A fresh start.');
+}
+
+function resetEverything() {
+  try { localStorage.removeItem(STORE_KEY); } catch (err) { /* storage blocked */ }
+  state = defaultState();
+  state.selectedDate = todayKey();
+  state.calMonth = monthKeyOf();
+  coachDraft = null;
+  coachPhoto = null;
+  save();
+
+  const form = $('#setupForm');
+  if (form) form.reset();
+  $('#sex').value = '';
+  $('#heightFt').value = 4;
+  $('#heightIn').value = 7;
+  $('#weight').value = '';
+  prefillSetup();
+  syncPregnancyRow();
+  renderAll();
+  showScreen('setup');
+  toast('Erased. Start fresh whenever you are ready.');
 }
 
 function needSetupHtml() {
@@ -518,6 +686,21 @@ function habitsCard(targets) {
   </div>`;
 }
 
+/* Refresh / reset controls, shown at the bottom of Targets in every mode. */
+function dataCard() {
+  const w = state.profile ? state.profile.weightKg : null;
+  return `<div class="card" id="dataCard">
+    <h3>Refresh or start over</h3>
+    <p class="hint">Your targets and plan are rebuilt from your details${w ? ` and your latest weight (${w} kg)` : ''}. Saving a new weight check-in in Progress refreshes them for you. You can also do it by hand here.</p>
+    <div class="stack">
+      <button class="btn btn-ghost" type="button" data-data="refresh">Refresh my targets and plan</button>
+      <button class="btn btn-ghost" type="button" data-data="today">Reset today's log</button>
+      <button class="btn danger" type="button" data-data="all">Start over (erase everything)</button>
+    </div>
+    <p class="small muted">Everything lives only on this phone. “Start over” cannot be undone.</p>
+  </div>`;
+}
+
 function renderTargets() {
   const box = $('#targetsContent');
   if (!state.profile || !state.targets) { box.innerHTML = needSetupHtml(); updateBadge(); return; }
@@ -525,7 +708,7 @@ function renderTargets() {
   updateBadge();
 
   if (t.mode === 'habits') {
-    box.innerHTML = safetyCards(t) + habitsCard(t);
+    box.innerHTML = safetyCards(t) + habitsCard(t) + dataCard();
     return;
   }
 
@@ -574,21 +757,47 @@ function renderTargets() {
     <div class="card calm">
       <h3>No promises, just a direction</h3>
       <p>We will not promise kilograms or a timeline. The plan aims for a small, repeatable deficit you can live with for months — with protein at every meal and food you actually enjoy.</p>
-    </div>`;
+    </div>
+    ${dataCard()}`;
 }
 
 /* ------------------------------- PLAN ---------------------------------- */
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const WEEK_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-/* "2 – 8 Nov 2026" (or "30 Oct – 5 Nov 2026" across months). */
-function weekLabelText(dates) {
-  const a = dates[0];
-  const b = dates[6];
-  if (a.getMonth() === b.getMonth()) {
-    return `${a.getDate()} – ${b.getDate()} ${MONTHS[b.getMonth()]} ${b.getFullYear()}`;
+function monthKeyOf(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function calendarMonth() {
+  if (!state.calMonth || !/^\d{4}-\d{2}$/.test(state.calMonth)) state.calMonth = monthKeyOf();
+  return state.calMonth;
+}
+
+function selectedDateKey() {
+  return state.selectedDate || todayKey();
+}
+
+/* The menu is a weekly template, so a date maps to its weekday. */
+function planDayName() {
+  const d = parseKey(selectedDateKey());
+  return WEEK[(d.getDay() + 6) % 7];
+}
+
+function shiftMonth(delta) {
+  const [y, m] = calendarMonth().split('-').map(Number);
+  const next = new Date(y, m - 1 + delta, 1);
+  state.calMonth = monthKeyOf(next);
+  /* Keep the plan and the visible month in step. */
+  if (selectedDateKey().slice(0, 7) !== state.calMonth) {
+    state.selectedDate = state.calMonth === monthKeyOf() ? todayKey() : state.calMonth + '-01';
   }
-  return `${a.getDate()} ${MONTHS[a.getMonth()]} – ${b.getDate()} ${MONTHS[b.getMonth()]} ${b.getFullYear()}`;
+  state.selectedDay = planDayName();
+  save();
+  renderCalendar();
+  renderPlan();
 }
 
 function mealsOn(key) {
@@ -605,32 +814,44 @@ function mealStreak() {
   return n;
 }
 
-function renderDayTabs() {
-  const box = $('#dayTabs');
-  if (!state.selectedDay) state.selectedDay = defaultDayName();
-  const dates = weekDates();
+/* The whole month, Monday first, with a dot on days that have a log. */
+function renderCalendar() {
+  const grid = $('#calGrid');
+  if (!grid) return;
+  const mKey = calendarMonth();
+  const [y, m] = mKey.split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const offset = (first.getDay() + 6) % 7; /* Monday = 0 */
+  const sel = selectedDateKey();
   const tk = todayKey();
+
+  const title = $('#calTitle');
+  if (title) title.textContent = MONTHS_FULL[m - 1] + ' ' + y;
+
+  let cells = '';
+  for (let i = 0; i < offset; i += 1) cells += '<span class="cal-day blank" aria-hidden="true"></span>';
+  let logged = 0;
+  for (let d = 1; d <= daysInMonth; d += 1) {
+    const key = mKey + '-' + String(d).padStart(2, '0');
+    const hasLog = mealsOn(key) || foodOn(key);
+    if (hasLog) logged += 1;
+    const active = key === sel;
+    const isToday = key === tk;
+    cells += `<button type="button" role="gridcell" class="cal-day${active ? ' active' : ''}${isToday ? ' is-today' : ''}" data-date="${key}" aria-selected="${active}" aria-label="${d} ${MONTHS_FULL[m - 1]} ${y}${hasLog ? ', logged' : ''}">
+      <span class="cal-num">${d}</span>
+      <span class="day-mark${hasLog ? ' on' : ''}" aria-hidden="true"></span>
+    </button>`;
+  }
+  grid.innerHTML = cells;
+
   const label = $('#weekLabel');
   if (label) {
     const streak = mealStreak();
-    label.innerHTML = `${weekLabelText(dates)}${streak > 0
+    const pct = Math.round((logged / daysInMonth) * 100);
+    label.innerHTML = `${logged} of ${daysInMonth} days logged (${pct}%)${streak > 0
       ? ` · <span class="streak-inline">🔥 ${streak}-day meal streak</span>`
       : ''}`;
-  }
-  box.innerHTML = WEEK.map((d, i) => {
-    const on = d === state.selectedDay;
-    const date = dates[i];
-    const isToday = todayKey(date) === tk;
-    const logged = mealsOn(todayKey(date));
-    return `<button type="button" role="tab" aria-selected="${on}" aria-label="${d} ${date.getDate()} ${MONTHS[date.getMonth()]}" class="day-tab${on ? ' active' : ''}${isToday ? ' is-today' : ''}" data-day="${d}">
-      <span class="day-short">${d.slice(0, 3)}</span>
-      <span class="day-num">${date.getDate()}</span>
-      <span class="day-mark${logged ? ' on' : ''}" aria-hidden="true"></span>
-    </button>`;
-  }).join('');
-  const active = box.querySelector('.day-tab.active');
-  if (active && active.scrollIntoView) {
-    active.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
 }
 
@@ -644,10 +865,12 @@ function planRow(item, showNumbers) {
 
 function renderPlan() {
   const box = $('#planContent');
-  renderDayTabs();
+  renderCalendar();
   if (!state.profile || !state.targets) { box.innerHTML = needSetupHtml(); return; }
 
-  const dayName = state.selectedDay || defaultDayName();
+  const selKey = selectedDateKey();
+  const selDate = parseKey(selKey);
+  const dayName = planDayName();
   const built = buildDay(dayName, state.profile, state.targets);
   const totals = dayNutrition(built);
   const showNums = state.targets.mode !== 'habits';
@@ -709,6 +932,7 @@ function renderPlan() {
   </details>`).join('');
 
   box.innerHTML = `
+    <p class="plan-date"><b>${WEEK_FULL[selDate.getDay()]} ${selDate.getDate()} ${MONTHS[selDate.getMonth()]} ${selDate.getFullYear()}</b>${selKey === todayKey() ? ' · today' : ''}<br><span class="muted">Showing the ${dayName} menu. The plan repeats each week, so every ${dayName} looks like this.</span></p>
     ${mealCards}
     ${quick}
     ${totalsCard}
@@ -1356,7 +1580,8 @@ function todayFoodCard(entries, allowed) {
     : `<span class="pill">${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}</span>`;
 
   const rows = entries.slice().reverse().map((e) => `<li class="coach-log-row">
-      <div>
+      ${e.photo ? `<button class="thumb-btn" type="button" data-photo-view="${esc(e.id)}" aria-label="See the photo for ${esc(e.text)}"><img class="coach-thumb" src="${e.photo}" alt=""></button>` : ''}
+      <div class="coach-log-main">
         <b>${esc(e.text)}</b>
         <span class="muted small">${e.items.map((i) => esc(i.name)).join(', ')} · ${esc(e.at)}</span>
       </div>
@@ -1391,6 +1616,7 @@ function renderCoach() {
   const allowed = state.targets.mode !== 'habits';
   box.innerHTML = (coachDraft ? coachCard(coachDraft) : emptyCoachCard())
     + todayFoodCard(foodLogToday(), allowed);
+  renderPhotoBox();
 }
 
 function analyzeCoachInput() {
@@ -1432,12 +1658,16 @@ function logFoodDraft(draft) {
     kcal: Math.round(draft.totals.kcal),
     p: Math.round(draft.totals.p),
     fib: Number(draft.totals.fib.toFixed(1)),
-    at: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    at: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+    photo: coachPhoto || null
   });
+  save();
+  prunePhotos(false);
   save();
   /* Ticking the meal box is optional, but it keeps the streak honest. */
   if (log.meals) log.meals.snack = true;
   coachDraft = null;
+  coachPhoto = null;
   state.coachDraft = null;
   save();
   const input = $('#coachInput');
@@ -1476,6 +1706,12 @@ function wireCoach() {
   const box = $('#coachContent');
   if (box) {
     box.addEventListener('click', (e) => {
+      const thumb = e.target.closest('[data-photo-view]');
+      if (thumb) {
+        const entry = foodLogToday().find((x) => x.id === thumb.dataset.photoView);
+        if (entry && entry.photo) openPhotoView(entry.photo);
+        return;
+      }
       const del = e.target.closest('[data-coach-del]');
       if (del) {
         const log = getLog(todayKey());
@@ -1520,6 +1756,43 @@ function wireCoach() {
     };
     rec.onerror = () => { mic.classList.remove('listening'); toast('Could not hear that. Type it instead.'); };
     rec.onend = () => mic.classList.remove('listening');
+  }
+
+  /* Camera (or gallery) for the plate. The photo is stored with the entry,
+     but the food is still named with words — nothing is identified from
+     pixels, and nothing leaves the phone. */
+  const cam = $('#coachCam');
+  const photoInput = $('#coachPhoto');
+  if (cam && photoInput) {
+    cam.addEventListener('click', () => photoInput.click());
+    photoInput.addEventListener('change', async () => {
+      const file = photoInput.files && photoInput.files[0];
+      photoInput.value = '';
+      if (!file) return;
+      try {
+        coachPhoto = await shrinkPhoto(file);
+        renderPhotoBox();
+        toast('Photo added. Tap what is on the plate, then Read it.');
+      } catch (err) {
+        toast(err && err.message ? err.message : 'Could not use that photo.');
+      }
+    });
+  }
+
+  const photoBox = $('#coachPhotoBox');
+  if (photoBox) {
+    photoBox.addEventListener('click', (e) => {
+      if (e.target.closest('[data-photo="remove"]')) {
+        coachPhoto = null;
+        renderPhotoBox();
+        return;
+      }
+      const plate = e.target.closest('[data-plate]');
+      if (!plate) return;
+      const input = $('#coachInput');
+      input.value = [input.value.trim(), plate.dataset.plate].filter(Boolean).join(', ');
+      input.focus();
+    });
   }
 }
 
@@ -1885,7 +2158,7 @@ function showScreen(name) {
   const renderers = {
     setup: prefillSetup,
     targets: renderTargets,
-    plan: function () { renderDayTabs(); renderPlan(); },
+    plan: function () { renderCalendar(); renderPlan(); },
     coach: renderCoach,
     groceries: renderGroceries,
     prep: renderPrep,
@@ -1918,12 +2191,64 @@ function wireStatic() {
     if (go) showScreen(go.dataset.go);
   });
 
-  $('#dayTabs').addEventListener('click', (e) => {
-    const tab = e.target.closest('.day-tab');
-    if (!tab) return;
-    state.selectedDay = tab.dataset.day;
+  /* Month calendar */
+  $('#calGrid').addEventListener('click', (e) => {
+    const cell = e.target.closest('.cal-day[data-date]');
+    if (!cell) return;
+    state.selectedDate = cell.dataset.date;
+    state.selectedDay = planDayName();
     save();
+    renderCalendar();
     renderPlan();
+  });
+  $('#calPrev').addEventListener('click', () => shiftMonth(-1));
+  $('#calNext').addEventListener('click', () => shiftMonth(1));
+  $('#calTitle').addEventListener('click', () => {
+    state.calMonth = monthKeyOf();
+    state.selectedDate = todayKey();
+    state.selectedDay = defaultDayName();
+    save();
+    renderCalendar();
+    renderPlan();
+  });
+
+  /* Today / month data actions and the confirm sheet */
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-data]');
+    if (btn) {
+      const kind = btn.dataset.data;
+      if (kind === 'refresh') refreshPlan();
+      else if (kind === 'today') {
+        askConfirm({
+          title: "Reset today's log?",
+          text: 'Water, meal ticks, movement and the food log for today will be cleared. Past days stay as they are.',
+          yes: 'Reset today',
+          onYes: resetToday
+        });
+      } else if (kind === 'all') {
+        askConfirm({
+          title: 'Start over?',
+          text: 'Every entry, weight, tick and setting on this phone will be erased. This cannot be undone.',
+          yes: 'Erase everything',
+          onYes: resetEverything
+        });
+      }
+      return;
+    }
+    if (e.target.id === 'sheetNo' || e.target.id === 'sheet') closeSheet();
+    if (e.target.id === 'photoView' || e.target.id === 'photoViewImg') closePhotoView();
+  });
+
+  $('#sheetYes').addEventListener('click', () => {
+    const run = sheetYes;
+    closeSheet();
+    if (run) run();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!$('#sheet').hidden) closeSheet();
+    if (!$('#photoView').hidden) closePhotoView();
   });
 
   /* Groceries */
@@ -1997,9 +2322,17 @@ function wireStatic() {
     state.weights = state.weights.filter((w) => w.date !== date);
     state.weights.push({ date, weight: Math.round(weight * 10) / 10, waist: waist ? Math.round(waist * 10) / 10 : null });
     state.weights.sort((a, b) => a.date.localeCompare(b.date));
+    /* The newest check-in becomes your working weight, so targets and the
+       plan are rebuilt without a second trip to Setup. */
+    const latest = state.weights[state.weights.length - 1];
+    if (state.profile && latest) {
+      state.profile.weightKg = latest.weight;
+      state.targets = calcTargets(state.profile);
+    }
     save();
-    renderProgress();
-    toast('Saved. One reading is a dot; the trend is the story.');
+    renderAll();
+    showScreen('progress');
+    toast(`Saved. Targets and plan refreshed for ${latest.weight.toFixed(1)} kg — estimates only.`);
   });
 
   /* Reminders */
@@ -2043,6 +2376,8 @@ function startDayWatch() {
     if (now === lastDayKey) return;
     lastDayKey = now;
     state.selectedDay = defaultDayName();
+    state.selectedDate = now;
+    state.calMonth = monthKeyOf();
     renderAll();
     showScreen(currentScreen);
     toast('New day, fresh start 🌿');
@@ -2074,7 +2409,9 @@ function init() {
   }
   syncPregnancyRow();
 
+  state.selectedDate = todayKey();
   state.selectedDay = defaultDayName();
+  state.calMonth = monthKeyOf();
   restoreCoachDraft();
 
   renderAll();

@@ -7,7 +7,7 @@ those need your own Google account.
 - **App bundle (upload this):** `download/thali-coach.aab` → also at
   <https://santollamanikanta.github.io/thali-coach/download/thali-coach.aab>
 - **Package name:** `com.thalicoach.app`
-- **Version:** 2 (`1.1`)
+- **Version:** 3 (`1.2`)
 - **Minimum Android:** 6.0 (API 23) · **Target:** Android 15 (API 35)
 - **Permissions:** Internet only. No location, camera, contacts, files or health
   permissions.
@@ -40,11 +40,13 @@ WHY IT IS DIFFERENT
 • Kind by design: if you are under 18, pregnant, breastfeeding, have a medical condition, or have a history of disordered eating, the app switches to healthy-habits mode and hides calorie deficits and weight targets.
 
 WHAT YOU GET
-• A 7-day plan with familiar meals and realistic portions, plus a grocery list and a prep list.
-• A food coach: type (or say, on the web) what you are eating — “2 samosa and 1 cup chai”. It estimates calories, protein and fibre, explains how to eat it, what to add, what to remove or reduce, a lighter swap, and what would happen if you ate it every day, shown as maths rather than a promise.
-• Water, meal, step and strength tracking, a weekly weight and waist check-in, and a simple progress view.
+• A full-month plan calendar: every date, with a dot on days you logged, and familiar meals with realistic portions.
+• A food coach: type (or say, on the web) what you are eating — “2 samosa and 1 cup chai”. It estimates calories, protein and fibre, explains how to eat it, what to add, what to remove or reduce, a lighter swap, and what would happen if you ate it every day, shown as maths rather than a promise. Snap a photo of the plate to keep it with the entry.
+• A grocery list and a prep list for the week.
+• Water, meal, step and strength tracking, a weekly weight and waist check-in, and a simple progress view. Saving a weigh-in refreshes your targets and plan.
 • Gentle reminders for meals, water and walks (in-app while the app is open).
 • Works offline. No account. No data leaves your device.
+• Free and open source (MIT): the full code is public.
 
 SAFETY FIRST
 Every number is an estimate from standard food tables. Thali Coach does not diagnose or treat anything and is not a replacement for a doctor or registered dietitian. Calorie floors (1,200 kcal for women, 1,500 kcal for men) are built in. There are no crash diets and no weight-loss promises.
@@ -161,13 +163,16 @@ storage, so uninstalling clears it.
 - AAB passes `bundletool validate`; module `base` contains the web assets,
   `classes.dex`, resources and manifest.
 - AAB is signed and `jarsigner -verify` passes.
-- Version code 2 / version name 1.1, minSdk 23, targetSdk 35.
+- Version code 3 / version name 1.2, minSdk 23, targetSdk 35.
 - APK is signed with v1 + v2 + v3 schemes and contains
   `assets/www/index.html`, `coach-data.js`, `coach.css`, `privacy.html`.
-- Web app tested at 360 px: coach parses “2 samosa and 1 cup chai” to
-  410 kcal, logs it, hides calories in healthy-habits mode, and has no
-  horizontal overflow.
+- Web app tested at 360 px: month calendar has 7 columns and no horizontal
+  overflow, coach parses “2 samosa and 1 cup chai” to 410 kcal, a photo flows
+  from the file input into the log thumbnail, saving a weigh-in rebuilds the
+  targets, and reset/start-over work behind the confirm sheet.
+- Healthy-habits mode still hides every calorie number.
 
 Not verified: installation on a physical Android device or emulator (none was
-available here). Please install the internal-testing build and tap through
-Setup → Coach → Progress before rolling out to production.
+available here). The camera hand-off uses the standard `onShowFileChooser`
+path plus a local content provider. Please install the internal-testing build
+and try Setup → Plan (calendar) → Coach (📷) → Progress before rolling out.

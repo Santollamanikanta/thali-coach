@@ -165,10 +165,20 @@
 
       <!-- 3 · PLAN ------------------------------------------------------- -->
       <section id="screen-plan" class="screen" hidden>
-        <h2>7-day plan</h2>
-        <p class="lede">Familiar food, realistic portions. Tap a day.</p>
-        <p class="week-label" id="weekLabel"></p>
-        <div class="day-tabs" id="dayTabs" role="tablist" aria-label="Days of the week"></div>
+        <h2>Plan</h2>
+        <p class="lede">A full month at a glance. Tap any date.</p>
+        <div class="card cal" id="calCard">
+          <div class="cal-head">
+            <button type="button" class="cal-nav" id="calPrev" aria-label="Previous month">‹</button>
+            <button type="button" class="cal-title" id="calTitle" aria-live="polite">Month</button>
+            <button type="button" class="cal-nav" id="calNext" aria-label="Next month">›</button>
+          </div>
+          <div class="cal-dow" aria-hidden="true">
+            <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+          </div>
+          <div class="cal-grid" id="calGrid" role="grid" aria-label="Month calendar"></div>
+          <p class="week-label" id="weekLabel"></p>
+        </div>
         <div id="planContent"></div>
       </section>
 
@@ -184,10 +194,14 @@
                    placeholder="e.g. 2 samosa and 1 cup chai"
                    aria-describedby="coachHint">
             <button class="mic" type="button" id="coachMic" hidden aria-label="Say it instead">🎤</button>
+            <button class="mic cam" type="button" id="coachCam" aria-label="Add a photo of your plate">📷</button>
             <button class="btn btn-slim" type="submit">Read it</button>
           </div>
+          <input type="file" id="coachPhoto" class="hidden-file" accept="image/*" capture="environment"
+                 tabindex="-1" aria-hidden="true">
+          <div id="coachPhotoBox" class="photo-box" hidden></div>
           <div class="chips coach-chips" id="coachChips"></div>
-          <p class="hint" id="coachHint">Add a quantity if you can: “2 idli”, “1 katori rice”, “1 packet chips”. Estimates only.</p>
+          <p class="hint" id="coachHint">Add a quantity if you can: “2 idli”, “1 katori rice”, “1 packet chips”. Tap 📷 to keep a photo of the plate with the entry. Estimates only.</p>
         </form>
 
         <div id="coachContent"></div>
@@ -233,7 +247,27 @@
     <footer class="footer">
       <p>Made for Indian kitchens. Estimates only, not medical advice.<br>If you need individual guidance, see a doctor or registered dietitian.</p>
       <p><a href="privacy.html">Privacy</a> · <a href="privacy.html#health">Health disclaimer</a></p>
+      <p class="small muted">Open source under the MIT licence ·
+        <a href="https://github.com/Santollamanikanta/thali-coach">Source code</a> ·
+        <a href="https://santollamanikanta.github.io/thali-coach/download/thali-coach-source.zip">Download source</a> ·
+        <a href="https://santollamanikanta.github.io/thali-coach/download/thali-coach.apk">Android app</a>
+      </p>
     </footer>
+  </div>
+
+  <div id="photoView" class="photo-view" hidden>
+    <img id="photoViewImg" alt="The plate you photographed">
+  </div>
+
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-card" role="alertdialog" aria-modal="true" aria-labelledby="sheetTitle" aria-describedby="sheetText">
+      <h3 id="sheetTitle">Are you sure?</h3>
+      <p id="sheetText" class="small"></p>
+      <div class="sheet-actions">
+        <button class="btn btn-ghost" type="button" id="sheetNo">Cancel</button>
+        <button class="btn danger" type="button" id="sheetYes">Yes</button>
+      </div>
+    </div>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>

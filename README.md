@@ -40,8 +40,20 @@ advice is shown.
 It is deliberately offline and rule-based: a fixed food table in
 `coach-data.js`, a small parser in `app.js`, no AI service, no API key and
 nothing sent off the phone. That means it handles common Indian foods and
-snacks, not arbitrary photos. Photo recognition would need an online vision
-model (and therefore a backend/API key), so it is not included.
+snacks, not arbitrary photos.
+
+### Camera / photo of the plate
+
+Tap **📷** on the Coach tab to take a photo (or pick one from the gallery). The
+photo is shrunk to a 560 px JPEG, stored with that day's entry, and shown as a
+thumbnail in the log; tap it to view it full screen. The last 12 photos are
+kept, so storage never fills.
+
+The photo is a memory aid, **not** recognition: a phone cannot name food from
+pixels offline, so after the snap the app shows tap-to-add chips (“2 idli”,
+“1 katori dal”…) and the words still do the reading. Real photo recognition
+would need an online vision model, an API key and a backend — deliberately out
+of scope for a no-login, no-server app.
 
 ## Android app (APK)
 
@@ -62,7 +74,7 @@ That script copies the web files in, then runs `aapt2` → `javac` → `d8` →
 
 ### Google Play bundle (AAB)
 
-`download/thali-coach.aab` is the signed Play upload bundle (version 2 / 1.1).
+`download/thali-coach.aab` is the signed Play upload bundle (version 3 / 1.2).
 It is built without Gradle by `C:\Users\DELL\thali-coach-android\build-aab.ps1`
 (`aapt2 --proto-format` → `javac` → `d8` → module zip → `bundletool` →
 `jarsigner`). Download `bundletool-all-<version>.jar` into that folder first.
@@ -73,7 +85,25 @@ content rating and a Console walkthrough — is in
 
 Limits of the shell: the app's own service worker is disabled inside it (so
 updates are never stale) and browser notifications are unavailable, so the
-Reminders tab can only show in-app nudges.
+Reminders tab can only show in-app nudges. The camera button opens the phone's
+camera app through `onShowFileChooser` + a tiny local `PhotoProvider`; no
+camera or storage permission is requested.
+
+## Plan calendar, refresh and restart
+
+The **Plan** tab shows a full month (Monday first) with a dot on every day that
+has a log. Tap any date to see that weekday's menu; arrows move month by month
+and tapping the month name jumps back to today.
+
+Targets and plan are rebuilt automatically when you save a weight check-in in
+Progress. **Targets → Refresh or start over** also gives you, by hand:
+
+- **Refresh my targets and plan** — recalculate from your current details.
+- **Reset today's log** — blank today only; past days stay.
+- **Start over** — erase everything on the phone and return to Setup.
+
+Each one asks for confirmation in a normal in-page sheet (not `window.confirm`,
+which is unreliable in a WebView).
 
 ## Files
 
@@ -90,6 +120,15 @@ Reminders tab can only show in-app nudges.
 | `sw.js` | Tiny service worker for offline use (network first, cache backup). |
 | `icon.svg` | App icon. |
 | `serve.js` | Optional local test server (Node, no packages). |
+| `LICENSE` | MIT licence — this is open source. |
+
+## Licence and downloads
+
+Thali Coach is open source under the [MIT licence](LICENSE). The full source,
+the Android shell and the build scripts are at
+<https://github.com/Santollamanikanta/thali-coach>. A source ZIP is also
+published at
+<https://santollamanikanta.github.io/thali-coach/download/thali-coach-source.zip>.
 
 ## The safety rules, built in
 
