@@ -5,7 +5,7 @@ Google Play Developer account, identity verification, and pressing **Publish** �
 those need your own Google account.
 
 - **App bundle (upload this):** `download/thali-coach.aab` → also at
-  <https://santollamanikanta.github.io/thali-coach/download/thali-coach.aab>
+  <https://github.com/Santollamanikanta/thali-coach/releases/latest/download/thali-coach.aab>
 - **Package name:** `com.thalicoach.app`
 - **Version:** 3 (`1.2`)
 - **Minimum Android:** 6.0 (API 23) · **Target:** Android 15 (API 35)

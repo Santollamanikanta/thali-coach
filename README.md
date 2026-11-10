@@ -124,11 +124,12 @@ which is unreliable in a WebView).
 
 ## Licence and downloads
 
-Thali Coach is open source under the [MIT licence](LICENSE). The full source,
-the Android shell and the build scripts are at
-<https://github.com/Santollamanikanta/thali-coach>. A source ZIP is also
-published at
-<https://santollamanikanta.github.io/thali-coach/download/thali-coach-source.zip>.
+Thali Coach is open source under the [MIT licence](LICENSE). Everything is on
+GitHub — the source, the APK, the Play bundle and the source ZIP:
+
+- Source: <https://github.com/Santollamanikanta/thali-coach>
+- Downloads (APK · AAB · source ZIP): <https://github.com/Santollamanikanta/thali-coach/releases/latest>
+- Web app (GitHub Pages): <https://santollamanikanta.github.io/thali-coach/>
 
 ## The safety rules, built in
 
