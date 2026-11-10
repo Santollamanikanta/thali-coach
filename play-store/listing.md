@@ -41,7 +41,7 @@ WHY IT IS DIFFERENT
 
 WHAT YOU GET
 • A 7-day plan with familiar meals and realistic portions, plus a grocery list and a prep list.
-• A food coach: type (or say, on the web) what you are eating — “2 samosa and 1 cup chai”. It estimates calories, protein and fibre, explains how to eat it, what to add, a lighter swap, and what would happen if you ate it every day, shown as maths rather than a promise.
+• A food coach: type (or say, on the web) what you are eating — “2 samosa and 1 cup chai”. It estimates calories, protein and fibre, explains how to eat it, what to add, what to remove or reduce, a lighter swap, and what would happen if you ate it every day, shown as maths rather than a promise.
 • Water, meal, step and strength tracking, a weekly weight and waist check-in, and a simple progress view.
 • Gentle reminders for meals, water and walks (in-app while the app is open).
 • Works offline. No account. No data leaves your device.

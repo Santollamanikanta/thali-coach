@@ -28,7 +28,7 @@ input), and replies with:
 
 - what it recognised and a rough calorie/protein/fibre estimate,
 - how to eat it (fibre first, slow start, water),
-- what to add so you are not hungry in an hour,
+- what you add (fibre, protein) and what to remove or halve,
 - what to swap for a lighter version of the same craving,
 - what happens **if you ate it every day** (shown as maths, not a promise),
 - Add to today / Ignore.

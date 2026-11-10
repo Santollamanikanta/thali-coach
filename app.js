@@ -1123,9 +1123,11 @@ function bestSwap(items, allowed) {
     const plan = COACH_SWAPS[item.key];
     const alt = nutritionForItem({ key: plan.to, qty: plan.qty, unit: null });
     if (!alt) return;
-    const saved = item.kcal - alt.kcal;
+    const portions = Math.max(1, item.qty || 1);
+    const perPortion = item.kcal / portions;
+    const saved = perPortion - alt.kcal;
     if (saved > 30 && (!best || saved > best.saved)) {
-      best = { from: item, to: alt, saved: saved, label: plan.label };
+      best = { from: item, to: alt, saved: saved, perPiece: portions > 1, label: plan.label };
     }
   });
   return best;
@@ -1211,6 +1213,28 @@ function addSuggestions(draft) {
   return out.slice(0, 3);
 }
 
+function removeSuggestions(draft) {
+  const out = [];
+  const over = draft.allowed && draft.leftAfter < 0;
+  const top = draft.items.slice().sort((a, b) => b.kcal - a.kcal)[0];
+
+  if (over && top) {
+    out.push(`Remove or halve the ${top.name} — that saves about ${num(Math.round(top.kcal / 2))} kcal and closes most of the gap.`);
+  }
+  if (draft.items.some((i) => (i.tags || []).includes('drink') && (i.tags || []).includes('sweet'))) {
+    out.push(draft.allowed
+      ? 'Drop the sugary drink. Water, chaas or nimbu pani without sugar does the same job for about 100 kcal less.'
+      : 'Drop the sugary drink. Water, chaas or nimbu pani without sugar does the same job.');
+  }
+  if (draft.items.some((i) => (i.tags || []).includes('fried')) && draft.items.length > 1) {
+    out.push('Keep one fried piece, not the whole plate. Fried food is the easiest place to cut without feeling deprived.');
+  }
+  if (top && top.unit === 'packet') {
+    out.push('Portion one serving onto a plate and put the packet away — the second half is rarely tasted anyway.');
+  }
+  return out.slice(0, 2);
+}
+
 function habitMaths(draft) {
   if (!draft.allowed) {
     return 'One snack never decides anything. Keep the next meal simple and protein-led, and go back to your usual routine.';
@@ -1259,6 +1283,7 @@ function coachCard(draft) {
   const verdict = coachVerdict(draft);
   const advice = adviceFor(draft);
   const adds = addSuggestions(draft);
+  const removes = removeSuggestions(draft);
   const allowed = draft.allowed;
 
   const totalsLine = allowed
@@ -1268,7 +1293,7 @@ function coachCard(draft) {
   const swapBlock = draft.swap
     ? `<div class="coach-swap">
         <h4>A lighter swap</h4>
-        <p>${esc(draft.swap.from.name)} → ${esc(draft.swap.label)}. About <b>${num(draft.swap.saved)} kcal less</b>, and more protein or fibre in most cases.</p>
+        <p>${esc(draft.swap.from.name)} → ${esc(draft.swap.label)}. About <b>${num(draft.swap.saved)} kcal less</b>${draft.swap.perPiece ? ' per piece' : ''}, and more protein or fibre in most cases.</p>
       </div>`
     : '';
 
@@ -1292,6 +1317,8 @@ function coachCard(draft) {
 
     <h4>Add / keep</h4>
     <ul class="ticks small">${adds.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
+
+    ${removes.length ? `<h4>Remove or reduce</h4><ul class="ticks small">${removes.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
 
     ${swapBlock}
 
